@@ -74,7 +74,8 @@ execute "initializing cluster with username: #{node[:db_couchbase][:cluster][:us
           " && /opt/couchbase/bin/couchbase-cli cluster-init" +
           "        -c 127.0.0.1:8091" +
           "        --cluster-init-username=#{node[:db_couchbase][:cluster][:username]}" +
-          "        --cluster-init-password=#{node[:db_couchbase][:cluster][:password]}")
+          "        --cluster-init-password=#{node[:db_couchbase][:cluster][:password]}" +
+          "        --cluster-ramsize=#{node[:db_couchbase][:cluster][:ram]}) 
   action :run
 end
 

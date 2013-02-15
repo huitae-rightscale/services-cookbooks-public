@@ -5,19 +5,20 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
 class Chef::Recipe
   include RightScale::App::Helper
 end
 
-vhosts(node[:lb][:vhost_names]).each do | vhost_name |
+# Adding iptables rule to disable loadbalancers <-> application servers connections
+pool_names(node[:lb][:pools]).each do | pool_name |
   sys_firewall "Close this appserver's ports to all loadbalancers" do
-    machine_tag "loadbalancer:#{vhost_name}=lb"
-    port node[:app][:port]
+    machine_tag "loadbalancer:#{pool_name}=lb"
+    port node[:app][:port].to_i
     enable false
     action :update
   end
 end
 
-rs_utils_marker :end
+rightscale_marker :end

@@ -5,7 +5,7 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
 DATA_DIR = node[:db][:data_dir]
 
@@ -18,11 +18,10 @@ db DATA_DIR do
 end
 
 include_recipe "db::setup_replication_privileges"
-# force first backup so that slaves can init from this master
-db_request_backup "do force backup" do
-  force true
-end
+
+# Perform first backup so that slaves can init from this master
+db_request_backup "do backup"
 
 include_recipe "db::do_primary_backup_schedule_enable"
 
-rs_utils_marker :end
+rightscale_marker :end

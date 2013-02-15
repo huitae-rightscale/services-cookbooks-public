@@ -5,20 +5,23 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
 class Chef::Recipe
   include RightScale::App::Helper
 end
 
-vhosts(node[:lb][:vhost_names]).each do | vhost_name |
-  sys_firewall "Request all appservers open ports to this loadbalancer" do
-    machine_tag "loadbalancer:#{vhost_name}=app"
-    port node[:app][:port]
-    enable true
-    ip_addr node[:cloud][:private_ips][0]
-    action :update_request
+# Sending request to application servers, to add iptables rule, which will allow connection with loadbalancer
+
+attrs = {:app => Hash.new}
+attrs[:app][:lb_ip] = node[:cloud][:private_ips][0]
+
+pool_names(node[:lb][:pools]).each do | pool_name |
+  remote_recipe "Update app servers firewall" do
+    recipe "app::handle_loadbalancers_allow"
+    recipients_tags "loadbalancer:#{pool_name}=app"
+    attributes attrs
   end
 end
 
-rs_utils_marker :end
+rightscale_marker :end

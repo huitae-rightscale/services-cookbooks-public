@@ -5,36 +5,31 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
-service "apache2" do
-  action :nothing
-end
+# This recipe will setup Apache vhost on port 80
 
-# == Setup PHP Apache vhost on port 80
-#
-php_port = "80"
+http_port = "80"
 
-# disable default vhost
+# Disable default vhost
 apache_site "000-default" do
   enable false
 end
 
+# Updating apache listen ports configuration
 template "#{node[:apache][:dir]}/ports.conf" do
   cookbook "apache2"
   source "ports.conf.erb"
-  variables :apache_listen_ports => php_port
-  notifies :restart, resources(:service => "apache2")
-#  notifies :restart, resources(:service => "apache2"), :immediately
+  variables :apache_listen_ports => http_port
 end
 
-# == Configure apache vhost for PHP
-#
+# Configure apache vhost
 web_app "#{node[:web_apache][:application_name]}.frontend" do
   template "apache.conf.erb"
   docroot node[:web_apache][:docroot]
-  vhost_port php_port
+  vhost_port http_port
   server_name node[:web_apache][:server_name]
+  notifies :restart, resources(:service => "apache2")
 end
 
-rs_utils_marker :end
+rightscale_marker :end

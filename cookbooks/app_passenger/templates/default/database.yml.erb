@@ -1,14 +1,20 @@
 #
-# DB Config file, version 1.2
+# Cookbook Name:: app_passenger
+#
+# Copyright RightScale, Inc. All rights reserved.  All access and use subject to the
+# RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
+# if applicable, other agreements such as a RightScale Master Subscription Agreement.
 #
 # Managed by RightScale
 # DO NOT EDIT BY HAND
 #
+# DB Config file
+#
 
-<%  case node[:app_passenger][:project][:db][:adapter]
+<%  case node[:app][:db_adapter]
     when "mysql" %>
 <%= node[:app_passenger][:project][:environment] %>:
-  adapter: <%= node[:app_passenger][:project][:db][:adapter] %>
+  adapter: <%= node[:app][:db_adapter] %>
   database: <%= @database %>
   username: <%= @user %>
   password: <%= @password %>
@@ -19,21 +25,21 @@
 # SQLite version 3.x
 <%= node[:app_passenger][:project][:environment] %>:
   host: <%= @fqdn %>
-  adapter: <%= node[:app_passenger][:project][:db][:adapter] %>
+  adapter: <%= node[:app][:db_adapter] %>
   database: <%= @database %>
   pool: 5
   timeout: 5000
-<%  when "postgresql"%>
+<%  when "postgres"%>
 <%= node[:app_passenger][:project][:environment] %>:
   host: <%= @fqdn %>
-  adapter: <%= node[:app_passenger][:project][:db][:adapter] %>
+  adapter: postgresql
   database: <%= @database %>
   username: <%= @user %>
   password: <%= @password %>
 <%  else%>
 <%= node[:app_passenger][:project][:environment] %>:
   host: <%= @sever %>
-  adapter: <%= node[:app_passenger][:project][:db][:adapter] %>
+  adapter: <%= node[:app][:db_adapter] %>
   database: <%= @database %>
 
 <%end%>

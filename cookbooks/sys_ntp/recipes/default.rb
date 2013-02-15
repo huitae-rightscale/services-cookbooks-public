@@ -17,25 +17,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
+# Install ntpdate package if "ubuntu"
 case node[:platform]
-when "ubuntu","debian"
+when "ubuntu"
   package "ntpdate" do
     action :install
   end
 end
 
+# Install ntp package in other cases
 package "ntp" do
   action :install
 end
 
+# Stop NTP service before configuration
 service node[:sys_ntp][:service] do
   action :stop
 end
 
-#
-# NTP doesn't always stop on Ubunut.  Make sure the process is gone
+# NTP doesn't always stop on Ubuntu. Make sure the process is gone
 bash "kill ntp" do
   flags "-ex"
   only_if { node[:platform] == 'ubuntu' }
@@ -44,7 +46,7 @@ bash "kill ntp" do
   EOH
 end
 
-
+# Configures Xen if applicable
 is_xen = ::File.exist?("/proc/sys/xen")
 log "  Configure Xen for independent wall clock..." if is_xen
 bash "independent wallclock" do
@@ -55,16 +57,17 @@ bash "independent wallclock" do
   EOH
 end
 
+# Update system time
 first_ntp_server = node[:sys_ntp][:servers].split(',')[0].strip
 log "  Update time using ntpdate and ntp server #{first_ntp_server}..."
 bash "update time" do
   flags "-ex"
   code <<-EOH
-    # TODO retry list of servers until succeed or all fail
     ntpdate #{first_ntp_server}
   EOH
 end
 
+# Configure NTP with cookbook template
 template "/etc/ntp.conf" do
   source "ntp.conf.erb"
   owner "root"
@@ -73,13 +76,16 @@ template "/etc/ntp.conf" do
   notifies :restart, resources(:service => node[:sys_ntp][:service])
 end
 
+# Create ntpstats directory
 directory "/var/log/ntpstats" do
   owner "ntp"
   group "ntp"
   mode 0755
 end
 
+# Start NTP service after configuration
 service node[:sys_ntp][:service] do
   action :start
 end
-rs_utils_marker :end
+
+rightscale_marker :end

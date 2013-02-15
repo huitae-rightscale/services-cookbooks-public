@@ -5,7 +5,7 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
 # Check for valid prefix / dump filename
 dump_file_regex = '(^\w+)(-\d{1,12})*$'
@@ -18,7 +18,7 @@ skip, reason = true, "Storage account provider not provided" if node[:db][:dump]
 skip, reason = true, "Container not provided"                if node[:db][:dump][:container] == ""
 
 if skip
-  log "Skipping import: #{reason}"
+  log "  Skipping import: #{reason}"
 else
 
   db_name      = node[:db][:dump][:database_name]
@@ -27,7 +27,7 @@ else
   container    = node[:db][:dump][:container]
   cloud        = node[:db][:dump][:storage_account_provider]
 
-  # Obtain the dumpfile from ROS 
+  # Obtain the dumpfile from ROS
   execute "Download dumpfile from Remote Object Store" do
     command "/opt/rightscale/sandbox/bin/ros_util get --cloud #{cloud} --container #{container} --dest #{dumpfilepath} --source #{prefix} --latest"
     creates dumpfilepath
@@ -37,7 +37,7 @@ else
     })
   end
 
-  # Restore the dump file to db. 
+  # Restore the dump file to db
   db node[:db][:data_dir] do
     dumpfile dumpfilepath
     db_name db_name
@@ -52,4 +52,4 @@ else
 
 end
 
-rs_utils_marker :end
+rightscale_marker :end

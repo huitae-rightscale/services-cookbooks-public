@@ -9,7 +9,7 @@
 # This is for development and test purpose and should not be used on
 # production servers.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
 raise "Force reset safety not off.  Override db/force_safety to run this recipe" unless node[:db][:force_safety] == "off"
 
@@ -17,7 +17,7 @@ class Chef::Recipe
   include RightScale::BlockDeviceHelper
 end
 
-log "  Brute force tear down of the setup....."
+log "  Brute force tear down of the setup..."
 
 DATA_DIR = node[:db][:data_dir]
 NICKNAME = get_device_or_default(node, :device1, :nickname)
@@ -41,18 +41,12 @@ tags_to_remove.each do |each_tag|
   bash "remove tags" do
     flags "-ex"
     code <<-EOH
-    rs_tag -r '#{each_tag}'
+      rs_tag -r '#{each_tag}'
     EOH
   end
 end
 
-ruby_block "Reset db node state" do
-  block do
-    node[:db][:this_is_master] = false
-    node[:db][:current_master_uuid] = nil
-    node[:db][:current_master_ip] = nil
-  end
-end
+db_state_set "Reset master/slave state"
 
 log "  Resetting database, then starting database..."
 db DATA_DIR do
@@ -68,9 +62,9 @@ block_device NICKNAME do
   action :backup_schedule_disable
 end
 
-log "  resetting collectd config..."
+log "  Resetting collectd config..."
 db DATA_DIR do
   action :setup_monitoring
 end
 
-rs_utils_marker :end
+rightscale_marker :end

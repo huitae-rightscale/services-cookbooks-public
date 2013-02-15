@@ -5,13 +5,14 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
+# This will set the DNS record identified by the “DNS Record ID” input to the first private IP address of the instance.
 sys_dns "default" do
   id node[:sys_dns][:id]
   address node[:cloud][:private_ips][0]
-
+  region node[:sys_dns][:region]
   action :set_private
 end
 
-rs_utils_marker :end
+rightscale_marker :end

@@ -12,7 +12,6 @@ action :stop do
     action :stop
     persist false
   end
-
 end
 
 # Start apache/passenger
@@ -20,6 +19,15 @@ action :start do
   log "  Running start sequence"
   service "apache2" do
     action :start
+    persist false
+  end
+end
+
+# Reload apache/passenger
+action :reload do
+  log "  Running reload sequence"
+  service "apache2" do
+    action :reload
     persist false
   end
 end
@@ -42,94 +50,47 @@ action :install do
     package p
   end
 
-  # Saving project name variables for use in operational mode
-  ENV['RAILS_APP'] = node[:web_apache][:application_name]
-
-  bash "save global vars" do
-    flags "-ex"
-    code <<-EOH
-      echo $RAILS_APP >> /tmp/appname
-    EOH
-  end
-
-  log "  Installing Ruby Enterprise Edition..."
-  cookbook_file "/tmp/ruby-enterprise-installed.tar.gz" do
-    source "ruby-enterprise_x86_64.tar.gz"
-    mode "0644"
-    only_if do node[:kernel][:machine].include? "x86_64" end
-    cookbook 'app_passenger'
-  end
-
-  cookbook_file "/tmp/ruby-enterprise-installed.tar.gz" do
-    source "ruby-enterprise_i686.tar.gz"
-    mode "0644"
-    only_if do node[:kernel][:machine].include? "i686" end
-    cookbook 'app_passenger'
-  end
-
-  bash "install_ruby_EE" do
-    flags "-ex"
-    code <<-EOH
-      tar xzf /tmp/ruby-enterprise-installed.tar.gz -C /opt/
-    EOH
-    only_if do ::File.exists?("/tmp/ruby-enterprise-installed.tar.gz")  end
-  end
-
-
   # Installing passenger module
-  log"  Installing passenger"
-  bash "Install apache passenger gem" do
-    flags "-ex"
-    code <<-EOH
-      /opt/ruby-enterprise/bin/gem install passenger -q --no-rdoc --no-ri
-    EOH
-    not_if do (::File.exists?("/opt/ruby-enterprise/bin/passenger-install-apache2-module")) end
+  log "  Installing passenger gem"
+  gem_package "passenger" do
+    gem_binary "/usr/bin/gem"
+    action :install
   end
 
-
-  bash "Install_apache_passenger_module" do
-    flags "-ex"
-    code <<-EOH
-      /opt/ruby-enterprise/bin/passenger-install-apache2-module --auto
-    EOH
-    not_if "test -e #{node[:app_passenger][:ruby_gem_base_dir].chomp}/gems/passenger*/ext/apache2/mod_passenger.so"
+  log "  Installing apache passenger module"
+  execute "Install apache passenger module" do
+    command "#{node[:app_passenger][:passenger_bin_dir]}/passenger-install-apache2-module --auto"
+    not_if { ::Dir.glob("#{node[:app_passenger][:ruby_gem_base_dir]}/gems/**/ext/apache2/mod_passenger.so").any? }
   end
 
 end
 
+
 # Setup apache/passenger virtual host
 action :setup_vhost do
   port = new_resource.port
-  project_root = new_resource.root
 
   # Removing preinstalled apache ssl.conf as it conflicts with ports.conf of web:apache
   log "  Removing ssl.conf"
   file "/etc/httpd/conf.d/ssl.conf" do
     action :delete
     backup false
-    only_if do ::File.exists?("/etc/httpd/conf.d/ssl.conf")  end
+    only_if { ::File.exists?("/etc/httpd/conf.d/ssl.conf") }
   end
 
-    # Enabling required apache modules
-    node[:app_passenger][:module_dependencies].each do |mod|
-      apache_module mod
-    end
-
-    # Apache fix on RHEL
-    file "/etc/httpd/conf.d/README" do
-      action :delete
-      only_if do node[:platform] == "redhat" end
-    end
-
-  # Generation of new apache ports.conf
-  log "  Generating new apache ports.conf"
-  node[:apache][:listen_ports] = port.to_s
-
-  template "#{node[:apache][:dir]}/ports.conf" do
-    cookbook "apache2"
-    source "ports.conf.erb"
-    variables :apache_listen_ports => node[:apache][:listen_ports]
+  # Enabling required apache modules
+  node[:app][:module_dependencies].each do |mod|
+    apache_module mod
   end
+
+  # Apache fix on RHEL
+  file "/etc/httpd/conf.d/README" do
+    action :delete
+    only_if do node[:platform] == "redhat" end
+  end
+
+  # Adds php port to list of ports for webserver to listen on
+  app_add_listen_port port.to_s
 
   log "  Unlinking default apache vhost"
   apache_site "000-default" do
@@ -137,7 +98,8 @@ action :setup_vhost do
   end
 
   # Generation of new vhost config, based on user prefs
-  log"  Generating new apache vhost"
+  log "  Generating new apache vhost"
+  project_root = new_resource.root
   web_app "http-#{port}-#{node[:web_apache][:server_name]}.vhost" do
     template                   "basic_vhost.erb"
     cookbook                   'app_passenger'
@@ -153,9 +115,9 @@ action :setup_vhost do
     destination                node[:app][:destination]
     apache_maintenance_page    node[:app_passenger][:apache][:maintenance_page]
     apache_serve_local_files   node[:app_passenger][:apache][:serve_local_files]
-
+    passenger_user             node[:app][:user]
+    passenger_group            node[:app][:group]
   end
-
 
 end
 
@@ -165,33 +127,18 @@ action :setup_db_connection do
 
   deploy_dir = new_resource.destination
   db_name = new_resource.database_name
-  db_adapter = node[:app_passenger][:project][:db][:adapter]
-  
-  log "  Generating database.yml"  
-  # Tell MySQL to fill in our connection template
-  if db_adapter == "mysql"  
-    db_mysql_connect_app "#{deploy_dir.chomp}/config/database.yml"  do
-      template      "database.yml.erb"
-      cookbook      "app_passenger"
-      owner         node[:app_passenger][:apache][:user]
-      group         node[:app_passenger][:apache][:user]
-      database      db_name
-    end
-  # Tell PostgreSQL to fill in our connection template    
-  elsif db_adapter == "postgresql"  
-    db_postgres_connect_app "#{deploy_dir.chomp}/config/database.yml"  do
-      template      "database.yml.erb"
-      cookbook      "app_passenger"
-      owner         node[:app_passenger][:apache][:user]
-      group         node[:app_passenger][:apache][:user]
-      database      db_name
-    end
-  else
-    raise "Unrecognized database adapter #{node[:app_passenger][:project][:db][:adapter]}, exiting "
-  end 
+  db_adapter = node[:app][:db_adapter]
 
-  # Defining $RAILS_ENV
-  ENV['RAILS_ENV'] = node[:app_passenger][:project][:environment]
+  log "  Generating database.yml"
+
+  # Tell Database to fill in our connection template
+  db_connect_app "#{deploy_dir.chomp}/config/database.yml" do
+    template      "database.yml.erb"
+    cookbook      "app_passenger"
+    owner         node[:app][:user]
+    group         node[:app][:group]
+    database      db_name
+  end
 
   # Creating bash file for manual $RAILS_ENV setup
   log "  Creating bash file for manual $RAILS_ENV setup"
@@ -200,47 +147,131 @@ action :setup_db_connection do
     source       "rails_env.erb"
     cookbook     'app_passenger'
     variables(
-        :environment => node[:app_passenger][:project][:environment]
-      )
+      :environment => node[:app_passenger][:project][:environment]
+    )
   end
 
 end
+
 
 # Download/Update application repository
 action :code_update do
   deploy_dir = new_resource.destination
 
+  log "  Starting code update sequence"
+  log "  Current project doc root is set to #{deploy_dir}"
 
-  # Reading app name from tmp file (for recipe execution in "operational" phase))
-  # Waiting for "run_lists"
-  if(deploy_dir == "/home/rails/")
-    app_name = IO.read('/tmp/appname')
-    deploy_dir = "/home/rails/#{app_name.to_s.chomp}"
-  end
-
-  # Preparing project dir, required for apache+passenger
-  log "  Creating directory for project deployment - <#{deploy_dir}>"
-  directory "/home/rails/" do
-    recursive true
-  end
-  
   log "  Starting source code download sequence..."
+  # Calling "repo" LWRP to download remote project repository
   repo "default" do
     destination deploy_dir
-    action :capistrano_pull
-    app_user node[:app_passenger][:apache][:user]
+    action node[:repo][:default][:perform_action].to_sym
+    app_user node[:app][:user]
     environment "RAILS_ENV" => "#{node[:app_passenger][:project][:environment]}"
+    repository node[:repo][:default][:repository]
     persist false
   end
 
-  log"  Generating new logrotatate config for rails application"
-  rs_utils_logrotate_app "rails" do
+  # Moving rails application log directory to ephemeral
+
+  # Removing log directory, preparing to symlink
+  directory "#{deploy_dir}/log" do
+    action :delete
+    recursive true
+  end
+
+  # Creating new rails application log  directory on ephemeral volume
+  directory "/mnt/ephemeral/log/rails/#{node[:web_apache][:application_name]}" do
+    owner node[:app][:user]
+    mode "0755"
+    action :create
+    recursive true
+  end
+
+  # Symlinking application log directory to ephemeral volume
+  link "#{deploy_dir}/log" do
+    to "/mnt/ephemeral/log/rails/#{node[:web_apache][:application_name]}"
+  end
+
+  log "  Generating new logrotate config for rails application"
+  rightscale_logrotate_app "rails" do
+    cookbook "rightscale"
+    template "logrotate.erb"
+    path ["#{deploy_dir}/log/*.log"]
+    frequency "size 10M"
+    rotate 4
+    create "660 #{node[:app][:user]} #{node[:app][:group]}"
+  end
+
+end
+
+
+# Setup monitoring tools for passenger
+action :setup_monitoring do
+  plugin_path = "#{node[:rightscale][:collectd_lib]}/plugins/passenger"
+
+  log "  Stopping collectd service"
+  service "collectd" do
+    action :stop
+  end
+
+  directory "#{node[:rightscale][:collectd_lib]}/plugins/" do
+    recursive true
+    not_if { ::File.exists?("#{node[:rightscale][:collectd_lib]}/plugins/") }
+  end
+
+  # Installing collectd plugin for passenger monitoring
+  template "#{plugin_path}" do
+    source "collectd_passenger.erb"
+    mode "0755"
+    backup false
     cookbook "app_passenger"
-    template "logrotate_rails.erb"
-    path ["#{deploy_dir}/log/*.log" ]
-    frequency "daily"
-    rotate 7
-    create "660 #{node[:app_passenger][:apache][:user]} #{node[:app_passenger][:apache][:user]}"
+    variables(
+      :apache_binary => node[:apache][:binary],
+      :passenger_memory_stats => "#{node[:app_passenger][:passenger_bin_dir]}/passenger-memory-stats",
+      :passenger_status => "#{node[:app_passenger][:passenger_bin_dir]}/passenger-status"
+    )
+  end
+
+  # Removing previous passenger.conf in case of stop-start
+  file "#{node[:rightscale][:collectd_plugin_dir]}/passenger.conf" do
+    backup false
+    action :delete
+  end
+
+  # Installing collectd config for passenger plugin
+  template "#{node[:rightscale][:collectd_plugin_dir]}/passenger.conf" do
+    cookbook "app_passenger"
+    source "collectd_passenger.conf.erb"
+    variables(
+      :apache_executable => node[:apache][:config_subdir],
+      :apache_user => node[:app][:user],
+      :plugin_path => plugin_path
+    )
+  end
+
+  # Collectd exec cannot run scripts under root user, so we need to give ability to use sudo to "apache" user
+  # passenger monitoring resources have strict restrictions, only for root can gather full stat info
+  # we gave permissions to apache user to access passenger monitoring resources
+  ruby_block "sudo setup" do
+    block { ::File.open('/etc/sudoers', 'a') { |file| file.puts "#includedir /etc/sudoers.d\n"} }
+    not_if { ::File.readlines("/etc/sudoers").grep(/^\s*#includedir\s+\/etc\/sudoers.d/).any? }
+  end
+
+  directory "/etc/sudoers.d/" do
+    recursive true
+  end
+
+  template "/etc/sudoers.d/passenger-status" do
+    cookbook "app_passenger"
+    source "passenger-status.erb"
+    mode "0440"
+    variables(
+      :user => node[:app][:user],
+      :passenger_bin_dir => node[:app_passenger][:passenger_bin_dir]
+    )
+    not_if { ::File.exists?("/etc/sudoers.d/passenger-status") }
+    notifies :start, resources(:service => "collectd")
   end
 
 end

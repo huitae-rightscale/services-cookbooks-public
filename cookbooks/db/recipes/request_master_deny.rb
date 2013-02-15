@@ -5,14 +5,13 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
-# == Verify initalized database
+# Verify initialized database
 # Check the node state to verify that we have correctly initialized this server.
 db_state_assert :slave
 
-# == Request firewall closed
-#
+# Request firewall closed
 db node[:db][:data_dir] do
   machine_tag "rs_dbrepl:master_instance_uuid=#{node[:db][:current_master_uuid]}"
   enable false
@@ -20,4 +19,4 @@ db node[:db][:data_dir] do
   action :firewall_update_request
 end
 
-rs_utils_marker :end
+rightscale_marker :end

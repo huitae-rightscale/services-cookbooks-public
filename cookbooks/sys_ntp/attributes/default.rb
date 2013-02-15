@@ -5,12 +5,12 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
+# Choosing the correct naming for NTP service
 case platform 
-when "ubuntu","debian"
+when "ubuntu"
   default[:sys_ntp][:service] = "ntp"
-when "redhat","centos","fedora"
+when "redhat","centos"
   default[:sys_ntp][:service] = "ntpd"
 end
 
-default[:sys_ntp][:is_server] = false
 default[:sys_ntp][:servers] = "time.rightscale.com, ec2-us-east.time.rightscale.com, ec2-us-west.time.rightscale.com"

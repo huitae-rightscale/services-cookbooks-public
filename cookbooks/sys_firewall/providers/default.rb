@@ -21,8 +21,8 @@ action :update do
 
   # We only support ip_addr or tags, however, ip_addr defaults to 'any' so reconcile here
   ip_addr.downcase!
-  ip_addr = nil if (ip_addr == "any") && machine_tag  # tags win, so clear 'any'
-  raise "ERROR: ip_addr param cannot be used with machine_tag param." if machine_tag && ip_addr
+  ip_addr = nil if (ip_addr == "any") && machine_tag # tags win, so clear 'any'
+  raise "ERROR: ip_addr param - #{ip_addr} - cannot be used with machine_tag param - #{machine_tag}." if machine_tag && ip_addr
 
   # Tell user what is going on
   msg = "#{to_enable ? "Enabling" : "Disabling"} firewall rule for port #{port}"
@@ -43,13 +43,13 @@ action :update do
     end
 
     if machine_tag
-      rs_utils_server_collection collection_name do
+      rightscale_server_collection collection_name do
         tags machine_tag
         secondary_tags ip_tag
       end
     end
 
-    ruby_block 'Register all currently active app servers' do
+    ruby_block 'Adding firewall rule' do
       block do
         ip_list = []
 
@@ -62,45 +62,43 @@ action :update do
           ip_list = node[:server_collection][collection_name].collect do |_, tags|
             RightScale::Utils::Helper.get_tag_value(ip_tag, tags, valid_ip_regex)
           end
-        end # if tag
+        end
 
         # Use iptables cookbook to create open/close port for ip list
         ip_list.each do |ip|
 
-          Chef::Log.info "Updating iptables rule for IP Address: #{ip}"
+          Chef::Log.info "  Updating iptables rule for IP Address: #{ip}"
 
           rule = "port_#{port}"
-          rule << "_#{ip.gsub('/','_')}_#{protocol}"
+          rule << "_#{ip.gsub('/', '_')}_#{protocol}"
 
           # Programatically execute template resource
           RightScale::System::Helper.run_template(
-                "/etc/iptables.d/#{rule}",    # target_file
-                "iptables_port.erb",          # source
-                "sys_firewall",               # cookbook
-                {                             # variables
-                  :port => port,
-                  :protocol => protocol,
-                  :ip_addr => (ip == "any") ? nil : ip
-                },
-                to_enable,                    # enable
-                "/usr/sbin/rebuild-iptables", # command to run
-                node,
-                @run_context)
-        end # each
+            "/etc/iptables.d/#{rule}", # target_file
+            "iptables_port.erb", # source
+            "sys_firewall", # cookbook
+            { # variables
+              :port => port,
+              :protocol => protocol,
+              :ip_addr => (ip == "any") ? nil : ip
+            },
+            to_enable, # enable
+            "/usr/sbin/rebuild-iptables", # command to run
+            node,
+            @run_context
+          )
+        end
+      end
+    end
+  end
 
-
-      end # block
-    end # ruby_block
-
-  end # else
-
-end # action
+end
 
 action :update_request do
 
-
   # Deal with attributes
   port = new_resource.port ? new_resource.port : new_resource.name
+  protocol = new_resource.protocol
   to_enable = new_resource.enable
   ip_addr = new_resource.ip_addr
   raise "ERROR: client_ip must be specified." unless ip_addr
@@ -111,11 +109,13 @@ action :update_request do
   msg = "Requesting port #{port} be #{to_enable ? "opened" : "closed"}"
   msg << " only for #{ip_addr}." if ip_addr
   msg << " on servers with tag: #{machine_tag}."
+  msg << " using protocol #{protocol}." if protocol
   log msg
 
   # Setup attributes
   attrs = {:sys_firewall => {:rule => Hash.new}}
   attrs[:sys_firewall][:rule][:port] = port
+  attrs[:sys_firewall][:rule][:protocol] = protocol
   attrs[:sys_firewall][:rule][:enable] = (to_enable == true) ? "enable" : "disable"
   attrs[:sys_firewall][:rule][:ip_address] = ip_addr
 

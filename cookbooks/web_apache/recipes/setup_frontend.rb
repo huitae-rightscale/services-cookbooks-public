@@ -5,14 +5,16 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+rightscale_marker :begin
 
 if node[:web_apache][:ssl_enable] == "true"
-  Chef::Log.info "Enabling SSL"
+  log "  Enabling SSL"
+  raise "ssl_certificate and ssl_key inputs must be defined when enabling SSL. Aborting..."\
+    unless ("#{node[:web_apache][:ssl_certificate]}" != "" && "#{node[:web_apache][:ssl_key]}" != "")
   include_recipe "web_apache::setup_frontend_ssl_vhost"
 else
-  Chef::Log.info "Using regular HTTP"
+  log "  Using regular HTTP"
   include_recipe "web_apache::setup_frontend_http_vhost"
 end
 
-rs_utils_marker :end
+rightscale_marker :end

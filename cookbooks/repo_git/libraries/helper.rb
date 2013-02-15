@@ -7,35 +7,37 @@
 
 module RightScale
   module Repo
-    class Ssh_key
-     KEYFILE = "/tmp/gitkey"
+    class GitSshKey
 
-     # Add ssh key and exec script
-     def create(ssh_key)
-       Chef::Log.info("Creating ssh key")
+      def initialize
+        @sshkey = SshKey.new
+      end
 
-       keyfile = nil
-       keyname = ssh_key
-       if "#{keyname}" != ""
-         keyfile = KEYFILE
-         system("echo -n '#{keyname}' > #{keyfile}")
-         system("chmod 700 #{keyfile}")
-         system("echo 'exec ssh -oStrictHostKeyChecking=no -i #{keyfile} \"$@\"' > #{keyfile}.sh")
-         system("chmod +x #{keyfile}.sh")
-       end
 
-       ENV["GIT_SSH"] = "#{keyfile}.sh" unless ("#{keyfile}" == "")
-     end
+      # Create bash script, which will set user defined ssh key required to access to private git source code repositories.
+      #
+      # @param ssh_key [string] Git private ssh key
+      #
+      # @raises [RuntimeError] if ssh key string is empty
+      def create(ssh_key)
+        @sshkey.create(ssh_key)
 
-     # Delete SSH key & clear GIT_SSH
-     def delete
-       Chef::Log.warn "Deleting ssh key "
-        keyfile = KEYFILE
-       if keyfile != nil
-         system("rm -f #{keyfile}")
-         system("rm -f #{keyfile}.sh")
-       end
-     end
+        Chef::Log.info("  Creating GIT_SSH environment variable")
+        ::File.open("#{SshKey::KEYFILE}.sh", "w") do |sshfile|
+          sshfile << "exec ssh -o StrictHostKeyChecking=no -i #{SshKey::KEYFILE} \"$@\""
+          sshfile.chmod(0777)
+        end
+
+        ENV["GIT_SSH"] = "#{SshKey::KEYFILE}.sh"
+      end
+
+
+      # Delete SSH key created by "create" method, after successful pull operation. And clear GIT_SSH.
+      def delete
+        @sshkey.delete
+        ::File.delete("#{SshKey::KEYFILE}.sh")
+      end
+
 
     end
   end

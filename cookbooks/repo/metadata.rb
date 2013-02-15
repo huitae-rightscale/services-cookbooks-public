@@ -3,106 +3,96 @@ maintainer_email "support@rightscale.com"
 license          "Copyright RightScale, Inc. All rights reserved."
 description      "Abstract cookbook for managing source code repositories."
 long_description IO.read(File.join(File.dirname(__FILE__), 'README.rdoc'))
+version          "13.2.0"
 
-version          "0.0.1"
+# supports "centos", "~> 5.8", "~> 6"
+# supports "redhat", "~> 5.8"
+# supports "ubuntu", "~> 10.04", "~> 12.04"
 
-depends "rs_utils"
+depends "rightscale"
 depends "repo_svn"
 depends "repo_git"
 depends "repo_ros"
+depends "repo_ftp"
+depends "repo_rsync"
 
-recipe  "repo::default", "Default recipe for setup resources provided"
-recipe  "repo::do_pull", "Recipe for pulling project repos from svn, git or ros."
+recipe  "repo::default", "Default recipe to setup provided resources."
+
 
 attribute "repo/default/provider",
   :display_name => "Repository Provider",
-  :description => "Select a repository provider: repo_git for Git, repo_svn for SVN or repo_ros for Remote Ojbect Store. Default: repo_git",
+  :description => "Specify where the application code should be checked out from. Example: repo_git",
   :required => "recommended",
-  :choice => ["repo_git", "repo_svn", "repo_ros"],
+  :choice => ["repo_git", "repo_svn", "repo_ros", "repo_ftp", "repo_rsync"],
   :default => "repo_git",
   :recipes => ["repo::default"]
 
 attribute "repo/default/repository",
-  :display_name => "Repository Url",
-  :description => "The URL of your svn or git repository where your application code will be checked out. Ex: http://mysvn.net/app/ or git@github.com/whoami/project",
-  :required => "recommended",
+  :display_name => "Repository URL/ROS Container",
+  :description => "The URL that points to the location of the repository that contains the application code. Or the name of the ROS container where a tarball of the application code will be retrieved from if you use 'repo_ros' provider. For Amazon S3, use the bucket name. Example: mycontainer,  http://mysvn.net/app/ or git://github.com/username/myapp.git",
+  :required => "required",
   :recipes => ["repo::default"]
 
 attribute "repo/default/revision",
-  :display_name => "Branch/Tag",
-  :description => "Enter the branch of your repository you want to fetch. Default: master",
+  :display_name => "Repository Branch/Tag/Commit",
+  :description => "The specific branch, tag, or commit (SHA) of the specified Git/Subversion repository that the application code will be retrieved from. For Git repositories, use 'master' to retrieve the master branch from the repository. Example: mybranch",
   :required => "recommended",
   :default => "master",
   :recipes => ["repo::default"]
 
-#SVN
-attribute "repo/default/svn_username",
-  :display_name => "SVN username",
-  :description => "Username for SVN repository.",
-  :required => "optional",
-  :default => "",
-  :recipes => ["repo::default"]
-
-attribute "repo/default/svn_password",
-  :display_name => "SVN password",
-  :description => "Password for SVN repository.",
-  :required => "optional",
-  :default => "",
-  :recipes => ["repo::default"]
-
-#GIT
-attribute "repo/default/ssh_key",
-  :display_name => "SSH Key",
-  :description => "The private SSH key of the git repository.",
-  :default => "",
+attribute "repo/default/account",
+  :display_name => "Account name",
+  :description => "The account name (i.e. username, ID) that is required to access files in the specified location. This input is optional and may not be required. Example: cred:RACKSPACE_USERNAME",
   :required => "recommended",
   :recipes => ["repo::default"]
 
-#ROS
+attribute "repo/default/credential",
+  :display_name => "Account credential",
+  :description => "A valid credential (i.e. password, SSH key, account secret) to access files in the specified location. This input is always required for Git and Rsync but may be optional for other providers. Example: cred:RACKSPACE_AUTH_KEY",
+  :required => "recommended",
+  :recipes => ["repo::default"]
+
+attribute "repo/default/perform_action",
+  :display_name => "Action",
+  :description => "Specify how the application code will be pulled from the specified repository. 'pull'- standard repository pull, 'capistrano_pull' standard repository pull plus a capistrano deployment style is applied. Example: pull",
+  :choice => [ "pull", "capistrano_pull" ],
+  :default => "pull",
+  :required => "optional",
+  :recipes => ["repo::default"]
+
+attribute "repo/default/destination",
+  :display_name => "Project App root",
+  :description => "The destination location where the application code will be placed on the local instance. If you want the application code to be placed in the root directory, use a forward slash (/) otherwise you will need to specify the full path (e.g. /path/to/code). The 'Application Name' input is used to name the destination folder into which the application code will be placed in the specified path. Apache and PHP will look for the application in the specified path. Example: /home/webapps",
+  :default => "/home/webapps",
+  :required => "optional",
+  :recipes => ["repo::default"]
+
+# ROS
+#
 attribute "repo/default/storage_account_provider",
   :display_name => "ROS Storage Account Provider",
-  :description => "Location where the source file is saved. Used by recipes to upload to Amazon S3 or Rackspace Cloud Files.",
+  :description => "The Remote Object Storage (ROS) service where the tarball of the application code will be retrieved from. Example: s3",
   :required => "optional",
-  :choice => [ "S3", "CloudFiles" ],
-  :recipes => ["repo::default"]
-
-attribute "repo/default/storage_account_id",
-  :display_name => "ROS Storage Account ID",
-  :description => "In order to write the repository to the specified cloud storage location, you need to provide cloud authentication credentials. For Amazon S3, use your Amazon access key ID (e.g., cred:AWS_ACCESS_KEY_ID). For Rackspace Cloud Files, use your Rackspace login username (e.g., cred:RACKSPACE_USERNAME).",
-  :required => "optional",
-  :recipes => ["repo::default"]
-
-attribute "repo/default/storage_account_secret",
-  :display_name => "ROS Storage Account Secret",
-  :description => "In order to write the dump file to the specified cloud storage location, you will need to provide cloud authentication credentials. For Amazon S3, use your AWS secret access key (e.g., cred:AWS_SECRET_ACCESS_KEY). For Rackspace Cloud Files, use your Rackspace account API key (e.g., cred:RACKSPACE_AUTH_KEY).",
-  :required => "optional",
+  :choice => [
+    "s3",
+    "cloudfiles",
+    "cloudfilesuk",
+    "google",
+    "azure",
+    "SoftLayer_Dallas",
+    "SoftLayer_Singapore",
+    "SoftLayer_Amsterdam"
+  ],
   :recipes => ["repo::default"]
 
 attribute "repo/default/container",
   :display_name => "ROS Container",
-  :description => "The cloud storage location where the dump file will be saved to or restored from. For Amazon S3, use the bucket name. For Rackspace Cloud Files, use the container name.",
+  :description => "The name of the ROS container where a tarball of the application code will be retrieved from. For Amazon S3, use the bucket name. For Rackspace Cloud Files, use the container name. Example: mycontainer",
   :required => "optional",
   :recipes => ["repo::default"]
 
 attribute "repo/default/prefix",
   :display_name => "ROS Prefix",
-  :description => "The prefix that will be used to name/locate the backup of a particular source repository. Defines the prefix of the source repo file name that will be used to name the downloaded repository file.",
+  :description => "The prefix that will be used to locate the correct tarball of the application. For example, if you're using 'myapp.tgz' specify 'myapp' as the ROS Prefix.",
   :required => "optional",
   :recipes => ["repo::default"]
-
-#capistrano attributes used in repo::do_pull
-
-attribute "repo/default/perform_action",
-  :display_name => "Action",
-  :description => "Choose the pull action which will be performed, 'pull'- standard repo pull, 'capistrano_pull' standard pull and then capistrano deployment style will be applied.",
-  :choice => [ "pull", "capistrano_pull" ],
-  :required => "recommended",
-  :recipes => ["repo::do_pull"]
-
-
-attribute "repo/default/destination",
-  :display_name => "Project App root",
-  :description => "Path to where project repo will be pulled",
-  :required => "recommended",
-  :recipes => ["repo::do_pull"]
-

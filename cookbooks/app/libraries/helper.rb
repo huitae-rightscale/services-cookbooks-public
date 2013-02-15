@@ -12,15 +12,12 @@ module RightScale
       # Return the IP address of the interface that this application server 
       # listens on.
       #
-      # == Parameters 
-      # private_ips(Array):: List of private ips assigned to the application server
-      # public_ips(Array):: List of public ips assigned to the application server
+      # @param private_ips [Array] List of private ips assigned to the application server
+      # @param public_ips [Array] List of public ips assigned to the application server
       #
-      # == Returns
-      # String:: IP Address 
+      # @return [String] IP Address
       #
-      # == Raise
-      # RuntimeError:: If nether a valid private nor public ip can be found
+      # @raises [RuntimeError] If nether a valid private nor public ip can be found
       def self.bind_ip(private_ips = [ ], public_ips = [ ])
         ip = nil
         if private_ips && private_ips.size > 0
@@ -34,13 +31,19 @@ module RightScale
       end
       
       # Return the port that this application server listens on
+      #
+      # @return [integer] Application port
       def self.bind_port()
-        node[:app][:port]
+        node[:app][:port].to_i
       end
 
-      # Returns array from a comma seperated list
-      def vhosts(vhost_list)
-        return vhost_list.gsub(/\s+/, "").split(",").uniq.each
+      # Returns array from a comma separated list
+      #
+      # @param pool_list [String] Comma separated list of URIs or FQDNs to create HAProxy pools for. Example: "/serverid, /appsever, default"
+      #
+      # @return [Array<String>] Array of pools Example: ["_serverid", "_appsever", "default"]
+      def pool_names(pool_list)
+        pool_norm_name = pool_list.gsub(/\s+/, "").gsub(/[\/]/, "_").split(",").uniq
       end
 
     end

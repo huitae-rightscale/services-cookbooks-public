@@ -5,7 +5,10 @@
 # RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
 # if applicable, other agreements such as a RightScale Master Subscription Agreement.
 
-rs_utils_marker :begin
+# This recipe will call "setup_db_connection" action of "app" LightWeight resource
+#  For more info please see "setup_db_connection" action definition in connected LightWeight provider (ex. app_php/providers/default.rb)
+
+rightscale_marker :begin
 
 log "  Creating database config for application"
 app "default" do
@@ -14,7 +17,6 @@ app "default" do
   database_password    node[:app][:database_password]
   database_sever_fqdn  node[:app][:database_sever_fqdn]
   action :setup_db_connection
-  persist true
 end
 
-rs_utils_marker :end
+rightscale_marker :end

@@ -1,21 +1,27 @@
 #
-# HTTP-only virtual host template with mod_jk
+# Cookbook Name:: app_tomcat
+#
+# Copyright RightScale, Inc. All rights reserved.  All access and use subject to the
+# RightScale Terms of Service available at http://www.rightscale.com/terms.php and,
+# if applicable, other agreements such as a RightScale Master Subscription Agreement.
 #
 # Managed by RightScale
 # DO NOT EDIT BY HAND
 #
+# HTTP-only virtual host template with mod_jk
+#
 
-# Listen <%= @vhost_port %>
-<VirtualHost *:<%= @vhost_port %>>
+# Listen <%=@params[:vhost_port]%>
+<VirtualHost *:<%=@params[:vhost_port]%>>
 
-     ServerName <%= @server_name %>
+     ServerName <%=@params[:server_name]%>
      UseCanonicalName On
 
-     DocumentRoot <%= @docroot %>
+     DocumentRoot <%=@params[:docroot]%>
       <DirectoryMatch  /\.git/|/\.svn/ >
        Deny from all
      </DirectoryMatch>
-     <Directory "<%= @docroot %>">
+     <Directory "<%=@params[:docroot]%>">
       Options FollowSymLinks
       AllowOverride None
       Order allow,deny
@@ -66,12 +72,8 @@
      # <CUSTOM RULES BEFORE FORWARDING END>
 
      # Setup the logs in the appropriate directory
-     CustomLog <%= @apache_log_dir %>/access_log combined
-     ErrorLog  <%= @apache_log_dir %>/error_log
-
-     #Remote logging -- handle by syslog
-     ErrorLog "|logger -p local3.info -t httperror"
-     CustomLog "|logger -p local3.info -t http" combined
+     CustomLog <%=@params[:apache_log_dir]%>/<%=@params[:server_name]%>-access_log combined
+     ErrorLog  <%=@params[:apache_log_dir]%>/<%=@params[:server_name]%>-error_log
 
      LogLevel warn
 

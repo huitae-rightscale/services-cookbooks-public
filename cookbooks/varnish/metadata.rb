@@ -12,6 +12,7 @@ provides "varnish::default"
 recipe "varnish::default", "Install and configure Varnish Cache"
 
 depends "rs_utils"
+depends "rightscale"
 
 attribute 'varnish/version',
 :display_name => "Varnish version",
